@@ -45,7 +45,7 @@
 
 static const uint32_t REBOOT_HOTKEY_ACTIVATION_TIME_MS = 50;
 static const uint32_t REBOOT_HOTKEY_HOLD_TIME_MS = 4000;
-static const uint32_t REBOOT_HOTKEY_DELAY_TIME_MS = 0;
+static const uint32_t REBOOT_HOTKEY_DELAY_TIME_MS = 4000;
 
 void GP2040::setup() {
 	Storage::getInstance().init();
