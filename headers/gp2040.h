@@ -12,6 +12,7 @@
 #include "gamepad.h"
 #include "addonmanager.h"
 #include "gpdriver.h"
+#include "system.h"
 
 #include "pico/types.h"
 
@@ -39,6 +40,9 @@ private:
         uint16_t webConfigHotkeyMask;
         uint16_t bootselHotkeyMask;
         absolute_time_t rebootHotkeysHoldTimeout;
+
+        absolute_time_t rebootDelay;
+				System::BootMode rebootMode;
     };
     RebootHotkeys rebootHotkeys;
 
