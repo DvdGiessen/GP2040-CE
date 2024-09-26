@@ -45,6 +45,7 @@
 
 static const uint32_t REBOOT_HOTKEY_ACTIVATION_TIME_MS = 50;
 static const uint32_t REBOOT_HOTKEY_HOLD_TIME_MS = 4000;
+static const uint32_t REBOOT_HOTKEY_DELAY_TIME_MS = 0;
 
 void GP2040::setup() {
 	Storage::getInstance().init();
@@ -427,41 +428,52 @@ GP2040::RebootHotkeys::RebootHotkeys() :
 	noButtonsPressedTimeout(nil_time),
 	webConfigHotkeyMask(GAMEPAD_MASK_S2 | GAMEPAD_MASK_B3 | GAMEPAD_MASK_B4),
 	bootselHotkeyMask(GAMEPAD_MASK_S1 | GAMEPAD_MASK_B3 | GAMEPAD_MASK_B4),
-	rebootHotkeysHoldTimeout(nil_time) {
+	rebootHotkeysHoldTimeout(nil_time),
+	rebootMode(System::BootMode::DEFAULT),
+	rebootDelay(nil_time) {
 }
 
 void GP2040::RebootHotkeys::process(Gamepad* gamepad, bool configMode) {
-	// We only allow the hotkey to trigger after we observed no buttons pressed for a certain period of time.
-	// We do this to avoid detecting buttons that are held during the boot process. In particular we want to avoid
-	// oscillating between webconfig and default mode when the user keeps holding the hotkey buttons.
-	if (!active) {
-		if (gamepad->state.buttons == 0) {
-			if (is_nil_time(noButtonsPressedTimeout)) {
-				noButtonsPressedTimeout = make_timeout_time_us(REBOOT_HOTKEY_ACTIVATION_TIME_MS);
-			}
-
-			if (time_reached(noButtonsPressedTimeout)) {
-				active = true;
-			}
-		} else {
-			noButtonsPressedTimeout = nil_time;
-		}
-	} else {
-		if (gamepad->state.buttons == webConfigHotkeyMask || gamepad->state.buttons == bootselHotkeyMask) {
-			if (is_nil_time(rebootHotkeysHoldTimeout)) {
-				rebootHotkeysHoldTimeout = make_timeout_time_ms(REBOOT_HOTKEY_HOLD_TIME_MS);
-			}
-
-			if (time_reached(rebootHotkeysHoldTimeout)) {
-				if (gamepad->state.buttons == webConfigHotkeyMask) {
-					// If we are in webconfig mode we go to gamepad mode and vice versa
-					System::reboot(configMode ? System::BootMode::GAMEPAD : System::BootMode::WEBCONFIG);
-				} else if (gamepad->state.buttons == bootselHotkeyMask) {
-					System::reboot(System::BootMode::USB);
+	if (is_nil_time(rebootDelay)) {
+		// We only allow the hotkey to trigger after we observed no buttons pressed for a certain period of time.
+		// We do this to avoid detecting buttons that are held during the boot process. In particular we want to avoid
+		// oscillating between webconfig and default mode when the user keeps holding the hotkey buttons.
+		if (!active) {
+			if (gamepad->state.buttons == 0) {
+				if (is_nil_time(noButtonsPressedTimeout)) {
+					noButtonsPressedTimeout = make_timeout_time_ms(REBOOT_HOTKEY_ACTIVATION_TIME_MS);
 				}
+
+				if (time_reached(noButtonsPressedTimeout)) {
+					active = true;
+				}
+			} else {
+				noButtonsPressedTimeout = nil_time;
 			}
 		} else {
-			rebootHotkeysHoldTimeout = nil_time;
+			if (gamepad->state.buttons == webConfigHotkeyMask || gamepad->state.buttons == bootselHotkeyMask) {
+				if (is_nil_time(rebootHotkeysHoldTimeout)) {
+					rebootHotkeysHoldTimeout = make_timeout_time_ms(REBOOT_HOTKEY_HOLD_TIME_MS);
+				}
+
+				if (time_reached(rebootHotkeysHoldTimeout)) {
+					if (gamepad->state.buttons == webConfigHotkeyMask) {
+						// If we are in webconfig mode we go to gamepad mode and vice versa
+						rebootMode = configMode ? System::BootMode::GAMEPAD : System::BootMode::WEBCONFIG;
+					} else if (gamepad->state.buttons == bootselHotkeyMask) {
+						rebootMode = System::BootMode::USB;
+					}
+					if (REBOOT_HOTKEY_DELAY_TIME_MS > 0) {
+						rebootDelay = make_timeout_time_ms(REBOOT_HOTKEY_DELAY_TIME_MS);
+					} else {
+						System::reboot(rebootMode);
+					}
+				}
+			} else {
+				rebootHotkeysHoldTimeout = nil_time;
+			}
 		}
+	} else if (time_reached(rebootDelay)) {
+		System::reboot(rebootMode);
 	}
 }
